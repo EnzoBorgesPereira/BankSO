@@ -92,7 +92,7 @@ do
     # Création super-utilisateur 
     lxc-attach -n $((300 + i)) -- useradd superuser --create-home --home /home/superuser/ -g wheel
     lxc-attach -n $((300 + i)) -- printf "su\nsu\n" | lxc-attach -n $((300 + i)) -- passwd superuser
-    lxc-attach -n $((300 + i)) -- sed -i 's/# %wheel ALL=(ALL) ALL/%wheel ALL=(ALL) ALL/g' /etc/sudoers
+    lxc-attach -n $((300 + i)) -- sed -i 's/# %wheel ALL=(ALL:ALL) ALL/%wheel ALL=(ALL) ALL/g' /etc/sudoers
 
     i=$(( $i + 1 ))
 done
@@ -193,7 +193,7 @@ do
     # Création super-utilisateur 
     lxc-attach -n $((302 + i)) -- useradd superuser --create-home --home /home/superuser/ -g wheel
     lxc-attach -n $((302 + i)) -- printf "su\nsu\n" | lxc-attach -n $((302 + i)) -- passwd superuser
-    lxc-attach -n $((302 + i)) -- sed -i 's/# %wheel ALL=(ALL) ALL/%wheel ALL=(ALL) ALL/g' /etc/sudoers
+    lxc-attach -n $((302 + i)) -- sed -i 's/# %wheel ALL=(ALL:ALL) ALL/%wheel ALL=(ALL) ALL/g' /etc/sudoers
 
     # Couper l'accès à root
     # lxc-attach $((302 + i)) -- passwd -l root
