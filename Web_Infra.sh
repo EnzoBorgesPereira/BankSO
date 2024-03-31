@@ -204,9 +204,6 @@ lxc-attach 300 -- pacman -S nginx --noconfirm
 lxc-attach 300 -- systemctl enable nginx
 lxc-attach 300 -- systemctl start nginx
 
-
-echo "Configuration du cluster et création des containers terminée."
-
 # -------------------------------------------
 
 # Configuration du load balancing
@@ -265,3 +262,24 @@ EOF"
 lxc-attach 300 -- systemctl restart nginx
 
 # -------------------------------------------
+
+# -------------------------------------------
+
+# Configuration des utilisateurs
+
+i=0
+CONTAINER_MAX=$((2 + $NUM_CONTAINERS))
+while [ $i -le  $CONTAINER_MAX ] 
+do
+    # Pour forcer le changement de mot de passe
+    lxc-attach -n $((300+$i)) -- passwd -e superuser
+
+    # Couper l'accès à root
+    lxc-attach -n $((300+$i)) -- passwd -l root
+
+    i=$(( $i + 1 ))
+done
+
+echo "Configuration des utilisateurs terminée."
+echo "Configuration du cluster et création des containers terminée."
+
