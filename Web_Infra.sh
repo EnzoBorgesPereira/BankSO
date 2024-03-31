@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # SUPPRIMER SI ON A DEJA DES CONTAINERS DE CREES ?
-ids=$(pct list)
+ids=$(pct list | awk 'NR>1 {print $1}')
 # lxc-info
 
 for id in $ids; do
@@ -104,8 +104,7 @@ done
 # Installation de MongoDB
 lxc-attach -n 302 -- su superuser -c "echo 'su' | sudo -S pacman -S --needed base-devel git --noconfirm"
 lxc-attach -n 302 -- su superuser -c "cd /home/superuser/ && git clone https://aur.archlinux.org/yay.git"
-lxc-attach -n 302 -- su superuser -c "cd /home/superuser/yay/ && echo 'su' | makepkg -sri --noconfirm"
-lxc-attach -n 302 -- su superuser -c "yay -S mongodb-bin"
+lxc-attach -n 302 -- su superuser -c "cd /home/superuser/yay/ && echo 'su' | sudo -S echo "hey" && makepkg -sri --noconfirm"
 lxc-attach -n 302 -- su superuser -c "yay -S --answerclean Installed --answerdiff Installed --removemake --noconfirm mongodb-bin"
 
 # Démarrage du service MongoDB
@@ -266,26 +265,3 @@ EOF"
 lxc-attach 300 -- systemctl restart nginx
 
 # -------------------------------------------
-
-# Configuration Serveur MongoDB
-
-# création super-utilisateur 
-lxc-attach -n 302 -- useradd superuser --create-home --home /home/superuser/ -g wheel
-
-# Changement du mot de passe
-lxc-attach -n 302 -- printf "su\nsu\n" | lxc-attach -n 302 -- passwd superuser
-# lxc-attach -n 302 -- passwd -e superuser
-
-# Modification du fichier sudoers
-lxc-attach -n 302 -- sed -i 's/# %wheel ALL=(ALL) ALL/%wheel ALL=(ALL) ALL/g' /etc/sudoers
-
-# Installation de MongoDB
-lxc-attach -n 302 -- su superuser -c "echo 'su' | sudo -S pacman -S --needed base-devel git --noconfirm"
-lxc-attach -n 302 -- su superuser -c "cd /home/superuser/ && git clone https://aur.archlinux.org/yay.git"
-lxc-attach -n 302 -- su superuser -c "cd /home/superuser/yay/ && echo 'su' | makepkg -sri --noconfirm"
-lxc-attach -n 302 -- su superuser -c "yay -S mongodb-bin"
-lxc-attach -n 301 -- su superuser -c "yay -S --answerclean Installed --answerdiff Installed --removemake --noconfirm mongodb-bin"
-
-# Démarrage du service MongoDB
-lxc-attach -n 302 -- systemctl enable mongodb
-lxc-attach -n 302 -- systemctl start mongodb
