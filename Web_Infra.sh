@@ -43,7 +43,7 @@ pveam download local archlinux-base_20230608-1_amd64.tar.zst
 # -------------------------------------------
 
 # Création du conteneur master
-pct create 300 local:vztmpl/archlinux-base_20230608-1_amd64.tar.zst --ostype debian --hostname master --password $CONTAINER_PASSWORD --storage BankSO-storage --cores 2 --net0 "name=eth0,bridge=vmbr2,ip=192.168.3.$((IP_START))/24,gw=192.168.3.1" --memory 512
+pct create 300 local:vztmpl/archlinux-base_20230608-1_amd64.tar.zst --ostype debian --hostname master --password $CONTAINER_PASSWORD --storage BankSO-storage --cores 2 --net0 "name=eth0,bridge=vmbr2,tag=10,ip=192.168.10.$((IP_START))/24,gw=192.168.10.1" --memory 512 --rootfs 20
 echo "Container master (CT ID 300) créé avec succès."
 pct set 300 -features 'nesting=1'
 # Démarrer le conteneur
@@ -54,7 +54,7 @@ echo "Container master (CT ID 300) démarré avec succès."
 # -------------------------------------------
 
 # Création du conteneur CA 
-pct create 301 local:vztmpl/archlinux-base_20230608-1_amd64.tar.zst --ostype debian --hostname CA --password $CONTAINER_PASSWORD --storage BankSO-storage --cores 2 --net0 "name=eth0,bridge=vmbr2,ip=192.168.3.$((IP_START+1))/24,gw=192.168.3.1" --memory 512
+pct create 301 local:vztmpl/archlinux-base_20230608-1_amd64.tar.zst --ostype debian --hostname CA --password $CONTAINER_PASSWORD --storage BankSO-storage --cores 2 --net0 "name=eth0,bridge=vmbr2,tag=10,ip=192.168.10.$((IP_START+1))/24,gw=192.168.10.1" --memory 512
 echo "Container CA (CT ID 301) créé avec succès."
 pct set 301 -features 'nesting=1'
 # Démarrer le conteneur
@@ -65,7 +65,7 @@ echo "Container CA (CT ID 301) démarré avec succès."
 # -------------------------------------------
 
 # Création du conteneur MongoDB
-pct create 302 local:vztmpl/archlinux-base_20230608-1_amd64.tar.zst --ostype debian --hostname MongoDB --password $CONTAINER_PASSWORD --storage BankSO-storage --cores 2 --net0 "name=eth0,bridge=vmbr2,ip=192.168.3.$((IP_START+2))/24,gw=192.168.3.1" --memory 512
+pct create 302 local:vztmpl/archlinux-base_20230608-1_amd64.tar.zst --ostype debian --hostname MongoDB --password $CONTAINER_PASSWORD --storage BankSO-storage --cores 2 --net0 "name=eth0,bridge=vmbr2,tag=10,ip=192.168.10.$((IP_START+2))/24,gw=192.168.10.1" --memory 512 --rootfs 20
 echo "Container MongoDB (CT ID 302) créé avec succès."
 pct set 302 -features 'nesting=1'
 # Démarrer le conteneur
@@ -112,11 +112,6 @@ lxc-attach -n 302 -- systemctl enable mongodb
 lxc-attach -n 302 -- systemctl start mongodb
 
 # -------------------------------------------
-# Pour forcer le changement de mot de passe
-lxc-attach -n 301 -- passwd -e superuser
-lxc-attach -n 302 -- passwd -e superuser
-
-# -------------------------------------------
 
 # CONFIGURATION DU SERVEUR CA
 
@@ -130,6 +125,16 @@ lxc-attach 301 -- chmod 400 ca.key
 lxc-attach 301 -- sed -i 's\#PermitRootLogin prohibit-password\PermitRootLogin yes\g' /etc/ssh/sshd_config
 lxc-attach 301 -- systemctl restart sshd
 
+# -------------------------------------------
+
+# CONFIGURATION DE SURICATA DANS LE CONTENEUR MASTER
+
+# Installation de Suricata
+
+lxc-attach -n 300 -- su superuser -c "echo 'su' | sudo -S pacman -S --needed base-devel git --noconfirm"
+lxc-attach -n 300 -- su superuser -c "cd /home/superuser/ && git clone https://aur.archlinux.org/yay.git"
+lxc-attach -n 300 -- su superuser -c "cd /home/superuser/yay/ && echo 'su' | sudo -S echo "hey" && makepkg -sri --noconfirm"
+lxc-attach -n 300 -- su superuser -c "echo 'su' | sudo -S echo "hey" && yay -S --answerclean Installed --answerdiff Installed --removemake --noconfirm suricata"
 
 # -------------------------------------------
 
@@ -140,11 +145,11 @@ while [ $i -le $NUM_CONTAINERS ]
 do
     CONTAINER_NAME="slave$i"
     # Attribuer une adresse IP à chaque nœud
-    IP_ADDRESS="192.168.3.$((IP_START+i+2))"
+    IP_ADDRESS="192.168.10.$((IP_START+i+2))"
     SERVER_INFO="/C=FR/ST=IDF/L=Paris/O=BankSO/OU=CA/CN=slave$i"
 
     # Création du conteneur
-    pct create $((302 + i)) local:vztmpl/archlinux-base_20230608-1_amd64.tar.zst --ostype debian --hostname $CONTAINER_NAME --password $CONTAINER_PASSWORD --storage BankSO-storage --cores 2 --net0 "name=eth0,bridge=vmbr2,ip=192.168.3.$((IP_START+2+$i))/24,gw=192.168.3.1" --memory 512
+    pct create $((302 + i)) local:vztmpl/archlinux-base_20230608-1_amd64.tar.zst --ostype debian --hostname $CONTAINER_NAME --password $CONTAINER_PASSWORD --storage BankSO-storage --cores 2 --net0 "name=eth0,bridge=vmbr2,tag=10,ip=192.168.10.$((IP_START+2+$i))/24,gw=192.168.10.1" --memory 512
     echo "Container $CONTAINER_NAME (CT ID $((302 + i))) créé avec succès."
     pct set $((302 + i)) -features 'nesting=1'
 
@@ -162,7 +167,7 @@ do
     lxc-attach $((302 + i)) -- pacman -Suy --noconfirm
 
     # Installation de sudo
-    lxc-attach $((300 + i)) -- pacman -S sudo --noconfirm
+    lxc-attach $((300 + i)) -- pacman -S sudo --noconfirm 
 
     # Installation Nginx
     lxc-attach $((302 + i)) -- pacman -S nginx --noconfirm
@@ -173,7 +178,6 @@ do
     lxc-attach $((302 + i)) -- pacman -S sshpass --noconfirm
     
     # Configuration du Nginx
-    # lxc-attach $((302 + i)) -- rm /usr/share/nginx/html/index.html
     lxc-attach $((302 + i)) -- rm /usr/share/nginx/html/index.html
     lxc-attach $((302 + i)) -- touch /usr/share/nginx/html/index.html
     lxc-attach $((302 + i)) -- echo "Slave $i" > /usr/share/nginx/html/index.html
@@ -181,9 +185,9 @@ do
     # Création de la clé privée et du certificat pour chaque serveur
     lxc-attach $((302 + i)) -- openssl genrsa -out slave$i.key 2048
     lxc-attach $((302 + i)) -- openssl req -new -key slave$i.key -out slave$i.csr --subj $SERVER_INFO
-    lxc-attach $((302 + i)) -- sshpass -p proxmox scp -o StrictHostKeyChecking=no slave$i.csr root@192.168.3.$((IP_START+1)):/tmp
+    lxc-attach $((302 + i)) -- sshpass -p proxmox scp -o StrictHostKeyChecking=no slave$i.csr root@192.168.10.$((IP_START+1)):/tmp
     lxc-attach 301 -- openssl x509 -req -in /tmp/slave$i.csr -CA ca.crt -CAkey ca.key -CAcreateserial -out /tmp/slave$i.crt -days 365
-    lxc-attach $((302 + i)) -- sshpass -p proxmox sftp -o StrictHostKeyChecking=no root@192.168.3.$((IP_START+1)):/tmp/slave$i.crt /tmp
+    lxc-attach $((302 + i)) -- sshpass -p proxmox sftp -o StrictHostKeyChecking=no root@192.168.10.$((IP_START+1)):/tmp/slave$i.crt /tmp
     lxc-attach $((302 + i)) -- mv /tmp/slave$i.crt /etc/nginx/slave$i.crt
     lxc-attach $((302 + i)) -- mv slave$i.key /etc/nginx/slave$i.key
 
@@ -191,11 +195,8 @@ do
 
     # Création super-utilisateur 
     lxc-attach -n $((302 + i)) -- useradd superuser --create-home --home /home/superuser/ -g wheel
-    lxc-attach -n $((302 + i)) -- printf "su\nsu\n" | lxc-attach -n $((302 + i)) -- passwd superuser
+    lxc-attach -n $((302 + i)) -- printf "su\nsu\n" | lxc-attach -n $((300 + i)) -- passwd superuser
     lxc-attach -n $((302 + i)) -- sed -i 's/# %wheel ALL=(ALL:ALL) ALL/%wheel ALL=(ALL) ALL/g' /etc/sudoers
-
-    # Couper l'accès à root
-    # lxc-attach $((302 + i)) -- passwd -l root
 
     i=$(( $i + 1 ))
 done
@@ -234,7 +235,8 @@ http {
     # Configuration du serveur Nginx
     server {
         listen 80;
-        server_name 192.168.200.50;
+        server_name 192.168.10.$((IP_START));
+
     
         location / {
             proxy_pass http://web_servers;
@@ -263,8 +265,6 @@ lxc-attach 300 -- systemctl restart nginx
 
 # -------------------------------------------
 
-# -------------------------------------------
-
 # Configuration des utilisateurs
 
 i=0
@@ -282,4 +282,3 @@ done
 
 echo "Configuration des utilisateurs terminée."
 echo "Configuration du cluster et création des containers terminée."
-
