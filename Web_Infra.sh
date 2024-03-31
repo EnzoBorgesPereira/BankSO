@@ -105,7 +105,7 @@ done
 lxc-attach -n 302 -- su superuser -c "echo 'su' | sudo -S pacman -S --needed base-devel git --noconfirm"
 lxc-attach -n 302 -- su superuser -c "cd /home/superuser/ && git clone https://aur.archlinux.org/yay.git"
 lxc-attach -n 302 -- su superuser -c "cd /home/superuser/yay/ && echo 'su' | sudo -S echo "hey" && makepkg -sri --noconfirm"
-lxc-attach -n 302 -- su superuser -c "yay -S --answerclean Installed --answerdiff Installed --removemake --noconfirm mongodb-bin"
+lxc-attach -n 302 -- su superuser -c "echo 'su' | sudo -S echo "hey" && yay -S --answerclean Installed --answerdiff Installed --removemake --noconfirm mongodb-bin"
 
 # Démarrage du service MongoDB
 lxc-attach -n 302 -- systemctl enable mongodb
