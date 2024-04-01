@@ -324,6 +324,45 @@ http {
 }" > /etc/nginx/nginx.conf'
 
 
+lxc-attach -n 300 -- /bin/bash -c "cat <<EOF > /etc/nginx/nginx.conf
+#user http;
+worker_processes  1;
+#error_log  logs/error.log;
+#error_log  logs/error.log  notice;
+#error_log  logs/error.log  info;
+#pid        logs/nginx.pid;
+events {
+    worker_connections  3024;
+}
+http {
+    include       mime.types;
+    default_type  application/octet-stream;
+    upstream web_servers {
+        $IP_LIST
+    }
+    
+    # Configuration du serveur Nginx
+    server {
+        listen 443 ssl;
+        server_name 192.168.10.$IP_START;
+
+        ssl_certificate /etc/nginx/loadbalancer.crt;
+        ssl_certificate_key /etc/nginx/loadbalancer.key;
+    
+        location / {
+            proxy_pass http://web_servers;
+        }
+    }
+
+    server {
+        listen 80;
+        server_name 192.168.10.$IP_START;
+        return 301 https://$host$request_uri;
+    }
+}
+EOF"
+
+
 
 lxc-attach 300 -- systemctl restart nginx
 
