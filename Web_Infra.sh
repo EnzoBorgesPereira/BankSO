@@ -86,13 +86,37 @@ do
     lxc-attach $((300 + i)) -- pacman-key --populate archlinux
     
     lxc-attach $((300 + i)) -- pacman -Suy --noconfirm
-    lxc-attach $((300 + i)) -- pacman -S sudo --noconfirm
-    lxc-attach $((300 + i)) -- pacman -S openssh --noconfirm
-    
+    lxc-attach $((300 + i)) -- pacman -S sudo openssh sshpass syslog-ng libmaxminddb librdkafka python redis mongo-c-driver net-snmp libdbi msmtp --noconfirm
+
+    lxc-attach -n $((300+$i)) -- /bin/bash -c 'echo "@version: 4.4
+@include "scl.conf"
+#
+# /etc/syslog-ng/syslog-ng.conf
+source s_local {
+    system();
+    internal();
+};
+filter f_sudo {
+    program("sudo");
+};
+destination d_remote {
+    tcp("192.168.10.10" port(514));
+};
+log {
+    source(s_local);
+    filter(f_sudo);
+    destination(d_remote);
+};" > /etc/syslog-ng/syslog-ng.conf'
+
+    lxc-attach -n $((300 + i)) -- systemctl restart syslog-ng@default.service
+    lxc-attach -n $((300 + i)) -- systemctl enable syslog-ng@default.service
+
     # Création super-utilisateur 
     lxc-attach -n $((300 + i)) -- useradd superuser --create-home --home /home/superuser/ -g wheel
     lxc-attach -n $((300 + i)) -- printf "su\nsu\n" | lxc-attach -n $((300 + i)) -- passwd superuser
     lxc-attach -n $((300 + i)) -- sed -i 's/# %wheel ALL=(ALL:ALL) ALL/%wheel ALL=(ALL) ALL/g' /etc/sudoers
+
+
 
     i=$(( $i + 1 ))
 done
@@ -167,7 +191,7 @@ do
     lxc-attach $((302 + i)) -- pacman -Suy --noconfirm
 
     # Installation de sudo
-    lxc-attach $((300 + i)) -- pacman -S sudo --noconfirm 
+    lxc-attach $((302 + i)) -- pacman -S sudo --noconfirm 
 
     # Installation Nginx
     lxc-attach $((302 + i)) -- pacman -S nginx --noconfirm
@@ -180,7 +204,7 @@ do
     # Configuration du Nginx
     lxc-attach $((302 + i)) -- rm /usr/share/nginx/html/index.html
     lxc-attach $((302 + i)) -- touch /usr/share/nginx/html/index.html
-    lxc-attach $((302 + i)) -- echo "Slave $i" > /usr/share/nginx/html/index.html
+    lxc-attach $((302 + i)) -- /bin/bash -c 'echo "Slave '"$i"'" > /usr/share/nginx/html/index.html'
 
     # Création de la clé privée et du certificat pour chaque serveur
     lxc-attach $((302 + i)) -- openssl genrsa -out slave$i.key 2048
@@ -191,11 +215,46 @@ do
     lxc-attach $((302 + i)) -- mv /tmp/slave$i.crt /etc/nginx/slave$i.crt
     lxc-attach $((302 + i)) -- mv slave$i.key /etc/nginx/slave$i.key
 
+    lxc-attach $((302 + i)) -- pacman -S sudo openssh sshpass syslog-ng libmaxminddb librdkafka python redis mongo-c-driver net-snmp libdbi msmtp --noconfirm
+    
+    # Configuration syslog-ng
+    lxc-attach $((302 + i)) -- /bin/bash -c 'echo "@version: 4.4
+@include "scl.conf"
+#
+# /etc/syslog-ng/syslog-ng.conf
+
+source s_local {
+    system();
+    internal();
+};
+
+filter f_sudo {
+    program("sudo");
+};
+
+filter f_nginx {
+    program("nginx");
+};
+
+destination d_remote {
+    tcp("192.168.10.10" port(514));
+};
+
+log {
+    source(s_local);
+    filter(f_sudo);
+    destination(d_remote);
+};
+
+log { source(s_local); filter(f_nginx); destination(d_remote); };" > /etc/syslog-ng/syslog-ng.conf'
+    lxc-attach -n $((302 + i)) -- systemctl restart syslog-ng@default.service
+    lxc-attach -n $((302 + i)) -- systemctl enable syslog-ng@default.service
+
     IP_LIST="$IP_LIST   server $IP_ADDRESS:80;"
 
     # Création super-utilisateur 
     lxc-attach -n $((302 + i)) -- useradd superuser --create-home --home /home/superuser/ -g wheel
-    lxc-attach -n $((302 + i)) -- printf "su\nsu\n" | lxc-attach -n $((300 + i)) -- passwd superuser
+    lxc-attach -n $((302 + i)) -- printf "su\nsu\n" | lxc-attach -n $((302 + i)) -- passwd superuser
     lxc-attach -n $((302 + i)) -- sed -i 's/# %wheel ALL=(ALL:ALL) ALL/%wheel ALL=(ALL) ALL/g' /etc/sudoers
 
     i=$(( $i + 1 ))
@@ -207,9 +266,17 @@ lxc-attach 300 -- systemctl start nginx
 
 # -------------------------------------------
 
+# Configuration de la clé privée et du certificat pour le loadbalanceur
+lxc-attach 300 -- openssl genrsa -out loadbalancer.key 2048
+lxc-attach 300 -- openssl req -new -key loadbalancer.key -out loadbalancer.csr --subj $SERVER_INFO
+lxc-attach 300 -- sshpass -p proxmox scp -o StrictHostKeyChecking=no loadbalancer.csr root@192.168.10.$((IP_START+1)):/tmp
+lxc-attach 301 -- openssl x509 -req -in /tmp/loadbalancer.csr -CA ca.crt -CAkey ca.key -CAcreateserial -out /tmp/loadbalancer.crt -days 365
+lxc-attach 300 -- sshpass -p proxmox sftp -o StrictHostKeyChecking=no root@192.168.10.$((IP_START+1)):/tmp/loadbalancer.crt /tmp
+lxc-attach 300 -- mv /tmp/loadbalancer.crt /etc/nginx/loadbalancer.crt
+lxc-attach 300 -- mv loadbalancer.key /etc/nginx/loadbalancer.key
+
 # Configuration du load balancing
-lxc-attach -n 300 -- /bin/bash -c "cat <<EOF > /etc/nginx/nginx.conf
-#user http;
+lxc-attach 300 -- /bin/bash -c 'echo "#user http;
 worker_processes  1;
 
 #error_log  logs/error.log;
@@ -234,31 +301,28 @@ http {
     
     # Configuration du serveur Nginx
     server {
-        listen 80;
+        listen 443 ssl;
         server_name 192.168.10.$((IP_START));
 
+        ssl_certificate /etc/nginx/loadbalancer.crt;
+        ssl_certificate_key /etc/nginx/loadbalancer.key;
     
         location / {
             proxy_pass http://web_servers;
         }
     }
+
+    server {
+        listen 80;
+        server_name 192.168.10.$((IP_START));
+        return 301 https://$host$request_uri;
+    }
     
     sendfile        on;
 
     keepalive_timeout  65;
+}" > /etc/nginx/nginx.conf'
 
-    # This block seems redundant, consider removing it
-    # server {
-    #     listen       80;
-    #     server_name  localhost;
-
-    #     location / {
-    #         root   /usr/share/nginx/html;
-    #         index  index.html index.htm;
-    #     }
-    # }
-}
-EOF"
 
 
 lxc-attach 300 -- systemctl restart nginx
