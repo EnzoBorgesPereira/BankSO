@@ -18,3 +18,5 @@ mkdir -p "$path"
 mongodump --db "$DB_NAME" --out "$path/$DB_NAME-$DATE"
 
 
+# restaurer les données
+#mongorestore --db DB --dir chemin/du/fichier/bjon
