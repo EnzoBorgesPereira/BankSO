@@ -130,6 +130,8 @@ lxc-attach -n 302 -- su superuser -c "echo 'su' | sudo -S pacman -S --needed bas
 lxc-attach -n 302 -- su superuser -c "cd /home/superuser/ && git clone https://aur.archlinux.org/yay.git"
 lxc-attach -n 302 -- su superuser -c "cd /home/superuser/yay/ && echo 'su' | sudo -S echo "hey" && makepkg -sri --noconfirm"
 lxc-attach -n 302 -- su superuser -c "echo 'su' | sudo -S echo "hey" && yay -S --answerclean Installed --answerdiff Installed --removemake --noconfirm mongodb-bin"
+lxc-attach -n 302 -- su superuser -c "echo 'su' | sudo -S echo "hey" && yay -S --answerclean Installed --answerdiff Installed --removemake --noconfirm mongodb-tools"
+
 
 # Démarrage du service MongoDB
 lxc-attach -n 302 -- systemctl enable mongodb
@@ -362,9 +364,20 @@ http {
 }
 EOF"
 
-
-
 lxc-attach 300 -- systemctl restart nginx
+
+# -------------------------------------------
+
+# Configuration de Suricata
+if lxc-attach -n 300 -- systemctl is-active --quiet "suricata"; then
+    echo "Suricata n'est pas installé. Reboot du serveur."
+    lxc-attach -n 300 -- reboot
+    sleep 30
+    lxc-attach -n 300 -- su superuser -c "echo 'su' | sudo -S echo "hey" && yay -S --answerclean Installed --answerdiff Installed --removemake --noconfirm suricata"
+fi
+
+lxc-attach -n 300 -- suricata-update
+lxc-attach -n 300 -- systemctl restart suricata
 
 # -------------------------------------------
 
@@ -382,6 +395,8 @@ do
 
     i=$(( $i + 1 ))
 done
+
+# -------------------------------------------
 
 echo "Configuration des utilisateurs terminée."
 echo "Configuration du cluster et création des containers terminée."
