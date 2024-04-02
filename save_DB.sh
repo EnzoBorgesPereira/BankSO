@@ -7,7 +7,7 @@ read DB_NAME
 echo
 
 echo -n "Entrez le chemin de l'archive : "
-read arch
+read path
 echo
 
 
