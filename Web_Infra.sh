@@ -116,8 +116,6 @@ log {
     lxc-attach -n $((300 + i)) -- printf "su\nsu\n" | lxc-attach -n $((300 + i)) -- passwd superuser
     lxc-attach -n $((300 + i)) -- sed -i 's/# %wheel ALL=(ALL:ALL) ALL/%wheel ALL=(ALL) ALL/g' /etc/sudoers
 
-
-
     i=$(( $i + 1 ))
 done
 
@@ -376,7 +374,10 @@ if lxc-attach -n 300 -- systemctl is-active --quiet "suricata"; then
     lxc-attach -n 300 -- su superuser -c "echo 'su' | sudo -S echo "hey" && yay -S --answerclean Installed --answerdiff Installed --removemake --noconfirm suricata"
 fi
 
+lxc-attach -n 300 -- su superuser -c "echo 'su' | sudo -S sed -i 's/#HOME_NET: "\[192\.168\.0\.0\/16\]"/HOME_NET: "\[192\.168\.10\.0\/24\]"/' /etc/suricata/suricata.yaml"
+
 lxc-attach -n 300 -- suricata-update
+lxc-attach -n 300 -- systemctl enable suricata
 lxc-attach -n 300 -- systemctl restart suricata
 
 # -------------------------------------------
