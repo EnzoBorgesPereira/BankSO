@@ -17,6 +17,4 @@ mkdir -p "$path"
 # Sauvegarde de la base de données
 mongodump --db "$DB_NAME" --out "$path/$DB_NAME-$DATE"
 
-# Compression de la sauvegarde
-tar -czvf "$path/$DB_NAME-$DATE.tar.gz" "$path/$DB_NAME-$DATE" 
 
