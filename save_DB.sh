@@ -10,6 +10,8 @@ echo -n "Entrez le chemin de l'archive : "
 read path
 echo
 
+# ajout des outils pour mongo
+yay -S mongodb-tools
 
 # Créer le dossier de sauvegarde s'il n'existe pas
 mkdir -p "$path"
